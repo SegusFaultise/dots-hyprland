@@ -164,6 +164,43 @@ v gsettings set org.gnome.desktop.interface font-name 'Rubik 11'
 v gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
 v kwriteconfig6 --file kdeglobals --group KDE --key widgetStyle Darkly
 
+# === MODIFICATION START: Install Snap packages ===
+printf "\e[36m[$0]: 1.5. Setting up and installing Snap packages\n\e[0m"
+
+# Install snapd from AUR if not already present
+if ! command -v snap &>/dev/null; then
+  printf "\e[33m-> Snapd not found. Installing from AUR...\e[0m\n"
+  v yay -S --needed --noconfirm snapd
+fi
+
+# Enable the snapd socket service
+printf "\e[33m-> Enabling and starting snapd socket...\e[0m\n"
+v sudo systemctl enable --now snapd.socket
+
+# Create classic confinement symlink if it doesn't exist
+# This is required for many snaps to work correctly.
+if [ ! -L /snap ]; then
+  printf "\e[33m-> Creating /snap symlink for classic confinement...\e[0m\n"
+  v sudo ln -s /var/lib/snapd/snap /snap
+fi
+
+# A short delay can help ensure the snapd service is fully ready
+sleep 3
+
+# Install snaps from snaplist.txt if it exists
+if [ -f "snaplist.txt" ]; then
+  printf "\e[33m-> Installing snaps from snaplist.txt...\e[0m\n"
+  while IFS= read -r snap_pkg || [ -n "$snap_pkg" ]; do
+    # Skip empty lines
+    if [ -n "$snap_pkg" ]; then
+      v sudo snap install "$snap_pkg"
+    fi
+  done <snaplist.txt
+else
+  printf "\e[33m-> snaplist.txt not found, skipping.\e[0m\n"
+fi
+# === MODIFICATION END ===
+
 #####################################################################################
 printf "\e[36m[$0]: 2. Copying + Configuring\e[0m\n"
 
