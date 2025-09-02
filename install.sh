@@ -13,7 +13,7 @@ if ! command -v pacman >/dev/null 2>&1; then
 fi
 prevent_sudo_or_root
 
-startask () {
+startask() {
   printf "\e[34m[$0]: Hi there! Before we start:\n"
   printf '\n'
   printf '[NEW] illogical-impulse is now powered by Quickshell. If you were using the old version with AGS and would like to keep it, do not run this script.\n'
@@ -28,14 +28,13 @@ startask () {
   printf "Would you like to create a backup for \"$XDG_CONFIG_HOME\" and \"$HOME/.local/\" folders?\n[y/N]: "
   read -p " " backup_confirm
   case $backup_confirm in
-    [yY][eE][sS]|[yY])
-      backup_configs
-      ;;
-    *)
-      echo "Skipping backup..."
-      ;;
+  [yY][eE][sS] | [yY])
+    backup_configs
+    ;;
+  *)
+    echo "Skipping backup..."
+    ;;
   esac
-
 
   printf '\n'
   printf 'Do you want to confirm every time before a command executes?\n'
@@ -44,15 +43,15 @@ startask () {
   printf '  a = Abort.\n'
   read -p "====> " p
   case $p in
-    n) ask=false ;;
-    a) exit 1 ;;
-    *) ask=true ;;
+  n) ask=false ;;
+  a) exit 1 ;;
+  *) ask=true ;;
   esac
 }
 
 case $ask in
-  false)sleep 0 ;;
-  *)startask ;;
+false) sleep 0 ;;
+*) startask ;;
 esac
 
 set -e
@@ -61,30 +60,44 @@ printf "\e[36m[$0]: 1. Get packages and setup user groups/services\n\e[0m"
 
 # Issue #363
 case $SKIP_SYSUPDATE in
-  true) sleep 0;;
-  *) v sudo pacman -Syu;;
+true) sleep 0 ;;
+*) v sudo pacman -Syu ;;
 esac
 
 remove_bashcomments_emptylines ${DEPLISTFILE} ./cache/dependencies_stripped.conf
-readarray -t pkglist < ./cache/dependencies_stripped.conf
+readarray -t pkglist <./cache/dependencies_stripped.conf
+
+# === MODIFICATION START: Add personal packages to the list ===
+printf "\e[32m[$0]: Reading personal package lists...\n\e[0m"
+if [ -f "pkglist.txt" ]; then
+  mapfile -t personal_pkgs <pkglist.txt
+  pkglist+=("${personal_pkgs[@]}")
+  printf "-> Added packages from pkglist.txt\n"
+fi
+if [ -f "aur_pkglist.txt" ]; then
+  mapfile -t personal_aur_pkgs <aur_pkglist.txt
+  pkglist+=("${personal_aur_pkgs[@]}")
+  printf "-> Added packages from aur_pkglist.txt\n"
+fi
+# === MODIFICATION END ===
 
 # Use yay. Because paru does not support cleanbuild.
 # Also see https://wiki.hyprland.org/FAQ/#how-do-i-update
-if ! command -v yay >/dev/null 2>&1;then
+if ! command -v yay >/dev/null 2>&1; then
   echo -e "\e[33m[$0]: \"yay\" not found.\e[0m"
   showfun install-yay
   v install-yay
 fi
 
 # Install extra packages from dependencies.conf as declared by the user
-if (( ${#pkglist[@]} != 0 )); then
-	if $ask; then
-		# execute per element of the array $pkglist
-		for i in "${pkglist[@]}";do v yay -S --needed $i;done
-	else
-		# execute for all elements of the array $pkglist in one line
-		v yay -S --needed --noconfirm ${pkglist[*]}
-	fi
+if ((${#pkglist[@]} != 0)); then
+  if $ask; then
+    # execute per element of the array $pkglist
+    for i in "${pkglist[@]}"; do v yay -S --needed $i; done
+  else
+    # execute for all elements of the array $pkglist in one line
+    v yay -S --needed --noconfirm ${pkglist[*]}
+  fi
 fi
 
 showfun handle-deprecated-dependencies
@@ -93,16 +106,16 @@ v handle-deprecated-dependencies
 # https://github.com/end-4/dots-hyprland/issues/581
 # yay -Bi is kinda hit or miss, instead cd into the relevant directory and manually source and install deps
 install-local-pkgbuild() {
-	local location=$1
-	local installflags=$2
+  local location=$1
+  local installflags=$2
 
-	x pushd $location
+  x pushd $location
 
-	source ./PKGBUILD
-	x yay -S $installflags --asdeps "${depends[@]}"
-	x makepkg -Asi --noconfirm
+  source ./PKGBUILD
+  x yay -S $installflags --asdeps "${depends[@]}"
+  x makepkg -Asi --noconfirm
 
-	x popd
+  x popd
 }
 
 # Install core dependencies from the meta-packages
@@ -110,13 +123,13 @@ metapkgs=(./arch-packages/illogical-impulse-{audio,backlight,basic,fonts-themes,
 metapkgs+=(./arch-packages/illogical-impulse-hyprland)
 metapkgs+=(./arch-packages/illogical-impulse-microtex-git)
 # metapkgs+=(./arch-packages/illogical-impulse-oneui4-icons-git)
-[[ -f /usr/share/icons/Bibata-Modern-Classic/index.theme ]] || \
+[[ -f /usr/share/icons/Bibata-Modern-Classic/index.theme ]] ||
   metapkgs+=(./arch-packages/illogical-impulse-bibata-modern-classic-bin)
 
 for i in "${metapkgs[@]}"; do
-	metainstallflags="--needed"
-	$ask && showfun install-local-pkgbuild || metainstallflags="$metainstallflags --noconfirm"
-	v install-local-pkgbuild "$i" "$metainstallflags"
+  metainstallflags="--needed"
+  $ask && showfun install-local-pkgbuild || metainstallflags="$metainstallflags --noconfirm"
+  v install-local-pkgbuild "$i" "$metainstallflags"
 done
 
 # These python packages are installed using uv, not pacman.
@@ -124,23 +137,23 @@ showfun install-python-packages
 v install-python-packages
 
 ## Optional dependencies
-if pacman -Qs ^plasma-browser-integration$ ;then SKIP_PLASMAINTG=true;fi
+if pacman -Qs ^plasma-browser-integration$; then SKIP_PLASMAINTG=true; fi
 case $SKIP_PLASMAINTG in
-  true) sleep 0;;
-  *)
-    if $ask;then
-      echo -e "\e[33m[$0]: NOTE: The size of \"plasma-browser-integration\" is about 600 MiB.\e[0m"
-      echo -e "\e[33mIt is needed if you want playtime of media in Firefox to be shown on the music controls widget.\e[0m"
-      echo -e "\e[33mInstall it? [y/N]\e[0m"
-      read -p "====> " p
-    else
-      p=y
-    fi
-    case $p in
-      y) x sudo pacman -S --needed --noconfirm plasma-browser-integration ;;
-      *) echo "Ok, won't install"
-    esac
-    ;;
+true) sleep 0 ;;
+*)
+  if $ask; then
+    echo -e "\e[33m[$0]: NOTE: The size of \"plasma-browser-integration\" is about 600 MiB.\e[0m"
+    echo -e "\e[33mIt is needed if you want playtime of media in Firefox to be shown on the music controls widget.\e[0m"
+    echo -e "\e[33mInstall it? [y/N]\e[0m"
+    read -p "====> " p
+  else
+    p=y
+  fi
+  case $p in
+  y) x sudo pacman -S --needed --noconfirm plasma-browser-integration ;;
+  *) echo "Ok, won't install" ;;
+  esac
+  ;;
 esac
 
 v sudo usermod -aG video,i2c,input "$(whoami)"
@@ -150,7 +163,6 @@ v sudo systemctl enable bluetooth --now
 v gsettings set org.gnome.desktop.interface font-name 'Rubik 11'
 v gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
 v kwriteconfig6 --file kdeglobals --group KDE --key widgetStyle Darkly
-
 
 #####################################################################################
 printf "\e[36m[$0]: 2. Copying + Configuring\e[0m\n"
@@ -164,71 +176,72 @@ v mkdir -p $XDG_BIN_HOME $XDG_CACHE_HOME $XDG_CONFIG_HOME $XDG_DATA_HOME
 
 # MISC (For .config/* but not fish, not Hyprland)
 case $SKIP_MISCCONF in
-  true) sleep 0;;
-  *)
-    for i in $(find .config/ -mindepth 1 -maxdepth 1 ! -name 'fish' ! -name 'hypr' -exec basename {} \;); do
-#      i=".config/$i"
-      echo "[$0]: Found target: .config/$i"
-      if [ -d ".config/$i" ];then v rsync -av --delete ".config/$i/" "$XDG_CONFIG_HOME/$i/"
-      elif [ -f ".config/$i" ];then v rsync -av ".config/$i" "$XDG_CONFIG_HOME/$i"
-      fi
-    done
-    ;;
+true) sleep 0 ;;
+*)
+  for i in $(find .config/ -mindepth 1 -maxdepth 1 ! -name 'fish' ! -name 'hypr' -exec basename {} \;); do
+    #      i=".config/$i"
+    echo "[$0]: Found target: .config/$i"
+    if [ -d ".config/$i" ]; then
+      v rsync -av --delete ".config/$i/" "$XDG_CONFIG_HOME/$i/"
+    elif [ -f ".config/$i" ]; then
+      v rsync -av ".config/$i" "$XDG_CONFIG_HOME/$i"
+    fi
+  done
+  ;;
 esac
 
 case $SKIP_FISH in
-  true) sleep 0;;
-  *)
-    v rsync -av --delete .config/fish/ "$XDG_CONFIG_HOME"/fish/
-    ;;
+true) sleep 0 ;;
+*)
+  v rsync -av --delete .config/fish/ "$XDG_CONFIG_HOME"/fish/
+  ;;
 esac
 
 # For Hyprland
 case $SKIP_HYPRLAND in
-  true) sleep 0;;
-  *)
-    v rsync -av --delete --exclude '/custom' --exclude '/hyprlock.conf' --exclude '/hypridle.conf' --exclude '/hyprland.conf' .config/hypr/ "$XDG_CONFIG_HOME"/hypr/
-    t="$XDG_CONFIG_HOME/hypr/hyprland.conf"
-    if [ -f $t ];then
-      echo -e "\e[34m[$0]: \"$t\" already exists.\e[0m"
-      v mv $t $t.old
-      v cp -f .config/hypr/hyprland.conf $t
-      existed_hypr_conf_firstrun=y
-    else
-      echo -e "\e[33m[$0]: \"$t\" does not exist yet.\e[0m"
-      v cp .config/hypr/hyprland.conf $t
-      existed_hypr_conf=n
-    fi
-    t="$XDG_CONFIG_HOME/hypr/hypridle.conf"
-    if [ -f $t ];then
-      echo -e "\e[34m[$0]: \"$t\" already exists.\e[0m"
-      v cp -f .config/hypr/hypridle.conf $t.new
-      existed_hypridle_conf=y
-    else
-      echo -e "\e[33m[$0]: \"$t\" does not exist yet.\e[0m"
-      v cp .config/hypr/hypridle.conf $t
-      existed_hypridle_conf=n
-    fi
-    t="$XDG_CONFIG_HOME/hypr/hyprlock.conf"
-    if [ -f $t ];then
-      echo -e "\e[34m[$0]: \"$t\" already exists.\e[0m"
-      v cp -f .config/hypr/hyprlock.conf $t.new
-      existed_hyprlock_conf=y
-    else
-      echo -e "\e[33m[$0]: \"$t\" does not exist yet.\e[0m"
-      v cp .config/hypr/hyprlock.conf $t
-      existed_hyprlock_conf=n
-    fi
-    t="$XDG_CONFIG_HOME/hypr/custom"
-    if [ -d $t ];then
-      echo -e "\e[34m[$0]: \"$t\" already exists, will not do anything.\e[0m"
-    else
-      echo -e "\e[33m[$0]: \"$t\" does not exist yet.\e[0m"
-      v rsync -av --delete .config/hypr/custom/ $t/
-    fi
-    ;;
+true) sleep 0 ;;
+*)
+  v rsync -av --delete --exclude '/custom' --exclude '/hyprlock.conf' --exclude '/hypridle.conf' --exclude '/hyprland.conf' .config/hypr/ "$XDG_CONFIG_HOME"/hypr/
+  t="$XDG_CONFIG_HOME/hypr/hyprland.conf"
+  if [ -f $t ]; then
+    echo -e "\e[34m[$0]: \"$t\" already exists.\e[0m"
+    v mv $t $t.old
+    v cp -f .config/hypr/hyprland.conf $t
+    existed_hypr_conf_firstrun=y
+  else
+    echo -e "\e[33m[$0]: \"$t\" does not exist yet.\e[0m"
+    v cp .config/hypr/hyprland.conf $t
+    existed_hypr_conf=n
+  fi
+  t="$XDG_CONFIG_HOME/hypr/hypridle.conf"
+  if [ -f $t ]; then
+    echo -e "\e[34m[$0]: \"$t\" already exists.\e[0m"
+    v cp -f .config/hypr/hypridle.conf $t.new
+    existed_hypridle_conf=y
+  else
+    echo -e "\e[33m[$0]: \"$t\" does not exist yet.\e[0m"
+    v cp .config/hypr/hypridle.conf $t
+    existed_hypridle_conf=n
+  fi
+  t="$XDG_CONFIG_HOME/hypr/hyprlock.conf"
+  if [ -f $t ]; then
+    echo -e "\e[34m[$0]: \"$t\" already exists.\e[0m"
+    v cp -f .config/hypr/hyprlock.conf $t.new
+    existed_hyprlock_conf=y
+  else
+    echo -e "\e[33m[$0]: \"$t\" does not exist yet.\e[0m"
+    v cp .config/hypr/hyprlock.conf $t
+    existed_hyprlock_conf=n
+  fi
+  t="$XDG_CONFIG_HOME/hypr/custom"
+  if [ -d $t ]; then
+    echo -e "\e[34m[$0]: \"$t\" already exists, will not do anything.\e[0m"
+  else
+    echo -e "\e[33m[$0]: \"$t\" does not exist yet.\e[0m"
+    v rsync -av --delete .config/hypr/custom/ $t/
+  fi
+  ;;
 esac
-
 
 # some foldes (eg. .local/bin) should be processed separately to avoid `--delete' for rsync,
 # since the files here come from different places, not only about one program.
@@ -276,21 +289,29 @@ printf "\e[36m\e[4m https://end-4.github.io/dots-hyprland-wiki/en/ii-qs/01setup/
 printf "\n"
 
 case $existed_hypr_conf_firstrun in
-  y) printf "\n\e[33m[$0]: Warning: \"$XDG_CONFIG_HOME/hypr/hyprland.conf\" already existed before. As it seems it is your first run, we replaced it with a new one. \e[0m\n"
-     printf "\e[33mAs it seems it is your first run, we replaced it with a new one. The old one has been renamed to \"$XDG_CONFIG_HOME/hypr/hyprland.conf.old\".\e[0m\n"
-;;esac
+y)
+  printf "\n\e[33m[$0]: Warning: \"$XDG_CONFIG_HOME/hypr/hyprland.conf\" already existed before. As it seems it is your first run, we replaced it with a new one. \e[0m\n"
+  printf "\e[33mAs it seems it is your first run, we replaced it with a new one. The old one has been renamed to \"$XDG_CONFIG_HOME/hypr/hyprland.conf.old\".\e[0m\n"
+  ;;
+esac
 case $existed_hypr_conf in
-  y) printf "\n\e[33m[$0]: Warning: \"$XDG_CONFIG_HOME/hypr/hyprland.conf\" already existed before and we didn't overwrite it. \e[0m\n"
-     printf "\e[33mPlease use \"$XDG_CONFIG_HOME/hypr/hyprland.conf.new\" as a reference for a proper format.\e[0m\n"
-;;esac
+y)
+  printf "\n\e[33m[$0]: Warning: \"$XDG_CONFIG_HOME/hypr/hyprland.conf\" already existed before and we didn't overwrite it. \e[0m\n"
+  printf "\e[33mPlease use \"$XDG_CONFIG_HOME/hypr/hyprland.conf.new\" as a reference for a proper format.\e[0m\n"
+  ;;
+esac
 case $existed_hypridle_conf in
-  y) printf "\n\e[33m[$0]: Warning: \"$XDG_CONFIG_HOME/hypr/hypridle.conf\" already existed before and we didn't overwrite it. \e[0m\n"
-     printf "\e[33mPlease use \"$XDG_CONFIG_HOME/hypr/hypridle.conf.new\" as a reference for a proper format.\e[0m\n"
-;;esac
+y)
+  printf "\n\e[33m[$0]: Warning: \"$XDG_CONFIG_HOME/hypr/hypridle.conf\" already existed before and we didn't overwrite it. \e[0m\n"
+  printf "\e[33mPlease use \"$XDG_CONFIG_HOME/hypr/hypridle.conf.new\" as a reference for a proper format.\e[0m\n"
+  ;;
+esac
 case $existed_hyprlock_conf in
-  y) printf "\n\e[33m[$0]: Warning: \"$XDG_CONFIG_HOME/hypr/hyprlock.conf\" already existed before and we didn't overwrite it. \e[0m\n"
-     printf "\e[33mPlease use \"$XDG_CONFIG_HOME/hypr/hyprlock.conf.new\" as a reference for a proper format.\e[0m\n"
-;;esac
+y)
+  printf "\n\e[33m[$0]: Warning: \"$XDG_CONFIG_HOME/hypr/hyprlock.conf\" already existed before and we didn't overwrite it. \e[0m\n"
+  printf "\e[33mPlease use \"$XDG_CONFIG_HOME/hypr/hyprlock.conf.new\" as a reference for a proper format.\e[0m\n"
+  ;;
+esac
 
 if [[ -z "${ILLOGICAL_IMPULSE_VIRTUAL_ENV}" ]]; then
   printf "\n\e[31m[$0]: \!! Important \!! : Please ensure environment variable \e[0m \$ILLOGICAL_IMPULSE_VIRTUAL_ENV \e[31m is set to proper value (by default \"~/.local/state/quickshell/.venv\"), or Quickshell config will not work. We have already provided this configuration in ~/.config/hypr/hyprland/env.conf, but you need to ensure it is included in hyprland.conf, and also a restart is needed for applying it.\e[0m\n"
